@@ -10,12 +10,17 @@ from fastapi.security import OAuth2PasswordBearer
 from auth_bearer import JWTBearer
 from functools import wraps
 from utils import create_access_token,create_refresh_token,verify_password,get_hashed_password
-from auth_bearer import JWTBearer
+
 from fastapi import APIRouter
 from sqlalchemy import Column, Integer, String, DateTime,Boolean
 from database import Base
+from decouple import config
 
-
+ACCESS_TOKEN_EXPIRE_MINUTES = config("ACCESS_TOKEN_EXPIRE_MINUTES")  # 30 minutes
+REFRESH_TOKEN_EXPIRE_MINUTES = config("REFRESH_TOKEN_EXPIRE_MINUTES") # 7 days
+ALGORITHM = config("ALGORITHM")
+JWT_SECRET_KEY = config("JWT_SECRET_KEY")   # should be kept secret
+JWT_REFRESH_SECRET_KEY = config("JWT_REFRESH_SECRET_KEY")
 
 routerUser = APIRouter()
 
@@ -70,7 +75,8 @@ def login(request: schemas.requestdetails, db: Session = Depends(get_session)):
 
 
 @routerUser.get('/getusers', tags=["Auth"])
-def getusers( dependencies=Depends(JWTBearer()),session: Session = Depends(get_session)):
+#def getusers(dependencies=Depends(JWTBearer()),session: Session = Depends(get_session)):
+def getusers(session: Session = Depends(get_session)):
     user = session.query(models.User).all()
     return user
 
@@ -111,3 +117,18 @@ def logout(dependencies=Depends(JWTBearer()), db: Session = Depends(get_session)
         db.commit()
         db.refresh(existing_token)
     return {"message":"Logout Successfully"} 
+
+def token_required(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+    
+        payload = jwt.decode(kwargs['dependencies'], JWT_SECRET_KEY, ALGORITHM)
+        user_id = payload['sub']
+        data= kwargs['session'].query(models.TokenTable).filter_by(user_id=user_id,access_toke=kwargs['dependencies'],status=True).first()
+        if data:
+            return func(kwargs['dependencies'],kwargs['session'])
+        
+        else:
+            return {'msg': "Token blocked"}
+        
+    return wrapper
