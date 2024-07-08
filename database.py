@@ -5,7 +5,7 @@ from sqlalchemy.orm import sessionmaker
 
 #SQLite
 
-#sqliteName = 'users.sqlite'
+sqliteName = 'users.sqlite'
 base_dir = os.path.dirname(os.path.realpath(__file__))
 databaseUrl = f'sqlite:///{os.path.join(base_dir, sqliteName)}'
 engine = create_engine(databaseUrl, echo =True)
